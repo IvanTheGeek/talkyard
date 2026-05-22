@@ -18,11 +18,35 @@ cd tests/e2e-wdio7/
 
 # [E2EHTTPS]
 # This is new Webdriver 7, since we're in tests/e2e-wdio7/.  [wdio_6_to_7]
-cmd="node_modules/.bin/wdio  wdio.conf.ts  $@"
+cmd="pnpm exec wdio  wdio.conf.ts  $@"
 echo
-echo "NODE_TLS_REJECT_UNAUTHORIZED=0  $cmd"
+echo "NODE_TLS_REJECT_UNAUTHORIZED=0  NODE_OPTIONS=--no-experimental-strip-types  $cmd"
 echo
-NODE_TLS_REJECT_UNAUTHORIZED=0  $cmd
+
+# Need  --no-experimental-strip-types  for enums to work. The flag tells Nodejs to let
+# ts-node or tsx run the file — they support `enum`.
+#
+# Otherwise this e2e test:
+#     s/wdio-7 --only rel-follow-own-domains.2br.f.e2e.ts --cd
+# fails instantly:
+#
+#     Error: /home/user/styd/ty21/tests/e2e-wdio7/specs/rel-follow-own-domains.2br.f.e2e.ts:22
+#       > enum Links {
+#           en_wikipedia_org = 'https://en.wikipedia.org',
+#           ...
+#     SyntaxError: TypeScript enum is not supported in strip-only mode
+#         at parseTypeScript (node:internal/modules/typescript:68:40)
+#         at processTypeScriptCode (node:internal/modules/typescript:146:42)
+#         at stripTypeScriptModuleTypes (node:internal/modules/typescript:209:22)
+#         at Object.getFileProtocolModuleFormat [as file:] (node:internal/modules/esm/get_format:199:26)
+#         at defaultGetFormat (node:internal/modules/esm/get_format:262:36)
+#         at defaultLoadSync (node:internal/modules/esm/load:158:16)
+#         at ModuleLoader.#loadAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:776:12)
+#
+# Can't use  --no-strip-types  (need to use --no-experimental-strip-types instead)
+# because for whatever reason `wdio` uses Node 22 not 24.
+#
+NODE_TLS_REJECT_UNAUTHORIZED=0  NODE_OPTIONS=--no-experimental-strip-types  $cmd
 exit_code=$?
 
 if [ $exit_code -ne 0 ]; then
@@ -31,7 +55,7 @@ if [ $exit_code -ne 0 ]; then
   echo "Error. Webdriverio 7 E2E test failed, exit code: $exit_code"
   echo
   echo "Was started like so:"
-  echo "    NODE_TLS_REJECT_UNAUTHORIZED=0  $cmd"
+  echo "    NODE_TLS_REJECT_UNAUTHORIZED=0  NODE_OPTIONS=--no-experimental-strip-types  $cmd"
 fi
 
 echo
