@@ -2,11 +2,11 @@
 
 # BUG this module no longer in use:
 git_lock_file='.git/modules/modules/ed-versions/index.lock'
-git_lock_file2='.git/modules/relchans/tyse-v0-regular/index.lock'
+git_lock_file2='.git/modules/relchans/tyse-v1-regular/index.lock'
 versions_file='version-tags.log'
 
-promote_from_branch='tyse-v0-dev'
-promote_to_branch='tyse-v0-regular'   #  [.must_be_dev_regular]
+promote_from_branch='tyse-v1-dev'
+promote_to_branch='tyse-v1-regular'   #  [.must_be_dev_regular]
 
 if [ -f $git_lock_file2 ]; then
   echo
@@ -105,12 +105,14 @@ echo "First, let's verify that all debiki/talkyard-*:$release_version_tag images
 echo
 
 set -x
-sudo docker pull debiki/talkyard-app:$release_version_tag
 sudo docker pull debiki/talkyard-web:$release_version_tag
-sudo docker pull debiki/talkyard-rdb:$release_version_tag
+sudo docker pull debiki/talkyard-app:$release_version_tag
+sudo docker pull debiki/talkyard-rendr:$release_version_tag
 sudo docker pull debiki/talkyard-cache:$release_version_tag
+sudo docker pull debiki/talkyard-rdb:$release_version_tag
 sudo docker pull debiki/talkyard-search:$release_version_tag
-sudo docker pull debiki/talkyard-certgen:$release_version_tag
+sudo docker pull debiki/talkyard-egressp:$release_version_tag
+sudo docker pull debiki/talkyard-backup:$release_version_tag
 set +x
 
 echo
