@@ -1,0 +1,30 @@
+# Specs that fail for ENVIRONMENTAL reasons on a plain box / CI runner —
+# not product bugs. Shell glob patterns, one per line; matched against
+# specs/<name>.e2e.ts basenames by b/impl/e2e-wdio7.sh --skip-expected-fails.
+# Derived from the 2026-07-05 full-suite baseline (categories re-verified
+# against the spec list 2026-07-19); refresh after the first full CI
+# baseline run.
+#
+# Needs external-IdP OAuth secrets (--secretsPath e2e-secrets.json):
+*.extidp.*
+# Embedded blog comments: need static site servers on :8080/:8000 that the
+# old host runner started (http-server, Gatsby builds). The Gatsby fixture
+# build is also hard-broken upstream ('How [pnpm_0_yarn]? exit 1' in
+# s/run-e2e-tests.sh). Recoverable later via an http-server sidecar in the
+# e2e-runner image — the non-Gatsby embcom specs would then come back.
+embcom.*
+embcom-*
+# Ghost-blog embedded comments: need the it-ghost container (compose
+# profile 'e2etests') AND the static servers.
+ghost.*
+# Embedded forum: same static-server needs as embcom.
+embforum.*
+# Link previews fetch REAL external sites (YouTube, Twitter, ...) — blocked
+# by egressp/no-egress environments.
+link-previews-*
+# Webhook specs assert deliveries via the fakeweb container (compose
+# profile 'e2etests', port 8090). Recoverable: start fakeweb with the
+# stack (docker compose --profile e2etests up -d fakeweb).
+*webhooks*
+# Known flaky in dev-mode runs (64s timeout posting a linked topic).
+backlinks-basic.*
