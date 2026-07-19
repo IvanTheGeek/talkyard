@@ -1,0 +1,29 @@
+#!/bin/bash
+# Print stable cache keys for CI (e.g. actions/cache). Each line:
+#   <component> <sha256>
+# Components:
+#   submodules  hash of all gitlink SHAs — key for the ty-vendors submodule
+#               checkouts (~1.6 GiB; changes rarely)
+#   nodedeps    hash of the pnpm lockfiles — key for tests/e2e-wdio7 etc
+#               node_modules installs
+#   images      hash of all Dockerfiles + compose files — key for docker
+#               layer caches
+#   sbt         hash of the sbt build definition — key for target/ +
+#               project/target/ incremental-compile caches
+#   all         hash of the above four
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+h() { sha256sum | cut -c1-16; }
+
+submodules=$(git submodule status | awk '{print $1}' | sort | h)
+nodedeps=$(cat pnpm-lock.yaml tests/e2e-wdio7/pnpm-lock.yaml to-talkyard/pnpm-lock.yaml 2>/dev/null | h)
+images=$(cat images/*/Dockerfile* docker-compose*.yml .env 2>/dev/null | h)
+sbt=$(cat build.sbt project/*.scala project/*.sbt project/build.properties version.txt 2>/dev/null | h)
+all=$(printf '%s %s %s %s' "$submodules" "$nodedeps" "$images" "$sbt" | h)
+
+echo "submodules $submodules"
+echo "nodedeps $nodedeps"
+echo "images $images"
+echo "sbt $sbt"
+echo "all $all"

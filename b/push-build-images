@@ -1,0 +1,41 @@
+#!/bin/bash
+# Push the expensive-to-build images to a registry so other machines / CI
+# runners can pull warm layers instead of rebuilding (~15 min saved cold).
+#
+#   b/push-build-images [registry-prefix]     e.g. forgejo.ivanthegeek.com/ivan
+#
+# Prefix defaults to $TY_IMG_REGISTRY. You must be docker-logged-in already.
+# Pushes :latest and :<git-short-sha> tags. Counterpart: b/pull-build-images.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+prefix="${1:-${TY_IMG_REGISTRY:-}}"
+if [ -z "$prefix" ]; then
+  echo "usage: b/push-build-images <registry-prefix>   (or set TY_IMG_REGISTRY)" >&2
+  exit 2
+fi
+sha="$(git rev-parse --short HEAD)"
+
+# Local name -> registry basename. The dev images that take real time to
+# build (app-dev: rust+sqlx stage; nodejs: used by every gulp step) plus our
+# two runner images. rdb/cache/search/etc are quick config layers on public
+# bases — not worth registry space.
+images=(
+  "ty-builder ty-builder"
+  "ty-e2e-runner ty-e2e-runner"
+  "debiki/talkyard-nodejs talkyard-nodejs"
+  "debiki/talkyard-app-dev talkyard-app-dev"
+)
+
+for entry in "${images[@]}"; do
+  local_name="${entry% *}"
+  remote_base="${entry#* }"
+  for tag in latest "$sha"; do
+    remote="$prefix/$remote_base:$tag"
+    echo "=== push $local_name -> $remote"
+    docker tag "$local_name" "$remote"
+    docker push "$remote"
+  done
+done
+echo "=== done (tags: latest, $sha)"

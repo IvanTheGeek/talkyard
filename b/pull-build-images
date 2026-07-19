@@ -1,0 +1,38 @@
+#!/bin/bash
+# Pull prebuilt build/runner images from a registry and retag them to the
+# local names every script expects — a cold machine skips ~15 min of image
+# building. Missing images are skipped with a warning (they'll be built
+# locally on demand instead).
+#
+#   b/pull-build-images [registry-prefix] [tag]
+#
+# Prefix defaults to $TY_IMG_REGISTRY, tag to 'latest'.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+prefix="${1:-${TY_IMG_REGISTRY:-}}"
+tag="${2:-latest}"
+if [ -z "$prefix" ]; then
+  echo "usage: b/pull-build-images <registry-prefix> [tag]   (or set TY_IMG_REGISTRY)" >&2
+  exit 2
+fi
+
+images=(
+  "ty-builder ty-builder"
+  "ty-e2e-runner ty-e2e-runner"
+  "debiki/talkyard-nodejs talkyard-nodejs"
+  "debiki/talkyard-app-dev talkyard-app-dev"
+)
+
+for entry in "${images[@]}"; do
+  local_name="${entry% *}"
+  remote_base="${entry#* }"
+  remote="$prefix/$remote_base:$tag"
+  echo "=== pull $remote -> $local_name"
+  if docker pull "$remote"; then
+    docker tag "$remote" "$local_name"
+  else
+    echo "    (not available — will be built locally when needed)" >&2
+  fi
+done

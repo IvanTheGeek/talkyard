@@ -34,8 +34,12 @@ if [ "${1:-}" = "--isolated" ]; then
   export DOCKER_HOST
 fi
 
-echo "b/e2e: building ty-e2e-runner image ..." >&2
-docker build -t ty-e2e-runner "$repo/images/e2e-runner" >&2
+# TY_E2E_RUNNER_IMG: use a prebuilt runner image (b/pull-build-images).
+runner_img="${TY_E2E_RUNNER_IMG:-ty-e2e-runner}"
+if [ -z "${TY_E2E_RUNNER_IMG:-}" ]; then
+  echo "b/e2e: building ty-e2e-runner image ..." >&2
+  docker build -t ty-e2e-runner "$repo/images/e2e-runner" >&2
+fi
 
 tty_flag=""
 if [ -t 0 ] && [ -t 1 ]; then tty_flag="-t"; fi
@@ -49,4 +53,4 @@ exec docker run --rm -i $tty_flag \
   -e TY_E2E_CHROME_BIN=/usr/bin/chromium \
   -e TY_E2E_CHROMEDRIVER_PATH=/usr/bin/chromedriver \
   -e TY_E2E_CHROME_NO_SANDBOX=1 \
-  ty-e2e-runner b/impl/e2e-wdio7.sh "$@"
+  "$runner_img" b/impl/e2e-wdio7.sh "$@"
