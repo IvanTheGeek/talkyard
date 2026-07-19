@@ -18,7 +18,7 @@
 #  OpenSSL 3.4.0 < 3.4.3 Multiple Vulnerabilities
 #  https://www.tenable.com/plugins/nessus/266295
 
-FROM alpine:3.22.3 AS openresty_build
+FROM alpine:3.22.3@sha256:55ae5d250caebc548793f321534bc6a8ef1d116f334f18f4ada1b2daad3251b2 AS openresty_build
 
 LABEL org.opencontainers.image.title="Talkyard Web" \
       io.talkyard.edition="se" \

@@ -1,4 +1,4 @@
-FROM denoland/deno:1.20.1
+FROM denoland/deno:1.20.1@sha256:8ccd586578055cc4b84ba9be9ba8719c3c34c2b402f49ee3b25570ff2409599d
 
 # Nice to haves:
 RUN \

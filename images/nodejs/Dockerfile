@@ -6,7 +6,7 @@
 # we use: ../../tests/e2e/flake.nix.
 
 # Images list: https://hub.docker.com/_/node/
-FROM node:24.14.0-trixie-slim
+FROM node:24.14.0-trixie-slim@sha256:8c8f12cedb96c3b59642cf30d713943c2b223990c9919b96a141681f62e6e292
 
 LABEL org.opencontainers.image.title="Talkyard Nodejs" \
       io.talkyard.edition="se" \
@@ -57,7 +57,7 @@ RUN cd /usr/local/bin/ && \
 # to-talkyard Makefile target). The base image has no pnpm and Node is
 # removing bundled corepack, so install explicitly. Same major as in
 # images/builder/Dockerfile.
-RUN npm install -g pnpm@10
+RUN npm install -g pnpm@10.34.5
 
 WORKDIR /opt/talkyard/server/
 

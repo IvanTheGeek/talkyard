@@ -10,7 +10,7 @@
 #
 # Same node base as images/nodejs/Dockerfile, so tool versions stay aligned.
 
-FROM node:24.14.0-trixie-slim
+FROM node:24.14.0-trixie-slim@sha256:8c8f12cedb96c3b59642cf30d713943c2b223990c9919b96a141681f62e6e292
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -25,7 +25,7 @@ RUN apt-get update \
 
 # pnpm: the repo's lockfiles are lockfileVersion 9.0. Pinned by major here;
 # exact-version + integrity pinning is planned in the hermetic-build pass.
-RUN npm install -g pnpm@10
+RUN npm install -g pnpm@10.34.5
 
 # No-op sudo shim: the build scripts run `sudo docker compose ...` and
 # `sudo VAR=val docker compose ...`. Inside this container the invoking user

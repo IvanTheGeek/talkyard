@@ -9,7 +9,7 @@
 
 # Image list: https://www.docker.elastic.co/r/elasticsearch
 # Docs: https://www.elastic.co/docs/deploy-manage/deploy/self-managed/install-elasticsearch-with-docker
-FROM docker.elastic.co/elasticsearch/elasticsearch:9.3.1-amd64
+FROM docker.elastic.co/elasticsearch/elasticsearch:9.3.1-amd64@sha256:6e63901da2004a0ef1f1e907a522bb32e134ee8dd9c8c6dc1671c3ca467061ec
 
 LABEL org.opencontainers.image.title="Talkyard Search" \
       io.talkyard.edition="se" \

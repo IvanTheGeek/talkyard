@@ -1,0 +1,82 @@
+#!/bin/bash
+# Digest-pin base images: rewrite FROM lines (and the dind pin in
+# b/impl/dind-lib.sh) from  image:tag  to  image:tag@sha256:...  so builds
+# resolve the exact bytes that were reviewed, not whatever the tag points at
+# later. Re-run after deliberately bumping a tag to refresh its digest.
+#
+#   b/pin-digests            rewrite files in place, print what changed
+#   b/pin-digests --check    exit 1 if any FROM line is unpinned (CI guard)
+#
+# Registry lookups use `docker buildx imagetools inspect` (no pulling).
+# The digest pinned is the multi-arch manifest-list digest — platform
+# resolution still happens at pull time.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+files=(
+  images/app/Dockerfile.dev
+  images/app/Dockerfile.prod
+  images/backup/Dockerfile
+  images/builder/Dockerfile
+  images/cache/Dockerfile
+  images/e2e-runner/Dockerfile
+  images/egressp/Dockerfile
+  images/fakeweb/Dockerfile
+  images/nodejs/Dockerfile
+  images/rdb/Dockerfile
+  images/rendr/Dockerfile
+  images/search/Dockerfile
+  images/web/Dockerfile
+)
+
+check_only=""
+[ "${1:-}" = "--check" ] && check_only=1
+
+unpinned=0
+declare -A digest_cache
+
+resolve() {  # ref -> digest (cached)
+  local ref="$1"
+  if [ -z "${digest_cache[$ref]:-}" ]; then
+    digest_cache[$ref]="$(docker buildx imagetools inspect "$ref" \
+        --format '{{json .Manifest.Digest}}' | tr -d '"')"
+  fi
+  echo "${digest_cache[$ref]}"
+}
+
+for f in "${files[@]}"; do
+  [ -f "$f" ] || continue
+  # FROM lines with a tag but no digest. (Plain 'FROM stagename' for
+  # multi-stage refs has no ':', so it's skipped naturally.)
+  while IFS= read -r line; do
+    ref="$(echo "$line" | awk '{print $2}')"
+    case "$ref" in
+      *@sha256:*) continue ;;
+      *:*) ;;
+      *) continue ;;
+    esac
+    if [ -n "$check_only" ]; then
+      echo "UNPINNED: $f: $ref"
+      unpinned=1
+      continue
+    fi
+    digest="$(resolve "$ref")"
+    sed -i "s|^\(FROM  *\)$ref|\1$ref@$digest|" "$f"
+    echo "pinned: $f: $ref@$digest"
+  done < <(grep -E '^FROM ' "$f")
+done
+
+# The dind image in b/impl/dind-lib.sh.
+dind_ref="$(sed -n 's/^TY_DIND_IMAGE=\([^@ ]*\)$/\1/p' b/impl/dind-lib.sh)"
+if [ -n "$dind_ref" ]; then
+  if [ -n "$check_only" ]; then
+    echo "UNPINNED: b/impl/dind-lib.sh: $dind_ref"
+    unpinned=1
+  else
+    digest="$(resolve "$dind_ref")"
+    sed -i "s|^TY_DIND_IMAGE=$dind_ref\$|TY_DIND_IMAGE=$dind_ref@$digest|" b/impl/dind-lib.sh
+    echo "pinned: b/impl/dind-lib.sh: $dind_ref@$digest"
+  fi
+fi
+
+exit $unpinned
