@@ -25,6 +25,13 @@ run make git-subm-init-upd || exit $fail
 step "node_modules (vendored)"
 run make node_modules || exit $fail
 
+step "dev images (compose build — no-op when cached)"
+# 'docker compose run' does NOT build missing images for services that also
+# have an 'image:' name — on a fresh daemon it tries to PULL debiki/*-dev,
+# which only exist locally. Build explicitly: nodejs (gulp), app (sbt), and
+# app's depends_on services.
+run sudo docker compose build nodejs app rendr cache rdb search egressp || exit $fail
+
 step "debug asset bundles (client TS/CSS, gulp in container)"
 run make debug_asset_bundles || exit $fail
 
