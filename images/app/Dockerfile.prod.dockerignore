@@ -1,0 +1,12 @@
+# BuildKit per-Dockerfile ignore file: applies ONLY when building with
+# -f images/app/Dockerfile.prod (repo root as context). Whitelist just what
+# the prod app image needs, so the context stays a few hundred MB instead of
+# the whole repo (node_modules, vendors, .git, ...).
+*
+!version.txt
+!target/universal/talkyard-server-*.zip
+!target/build-info
+!images/app/assets
+!images/app/migrations
+!images/app/entrypoint.prod.sh
+!images/app/chown-postgres_password.sh

@@ -1,3 +1,21 @@
+# Multi-stage build [appsv_build_image]: the dist_prep stage below unpacks
+# the sbt 'dist' zip and lays files out for the final image, which used to be
+# done on the host by s/impl/build-prod-app-image.sh. Build from the REPO
+# ROOT with the version as a build arg:
+#
+#   docker build -f images/app/Dockerfile.prod \
+#       --build-arg TALKYARD_VERSION=$(sed s/WIP/SNAPSHOT/ version.txt) \
+#       --tag <org>/talkyard-app:latest .
+#
+# Context stays tiny — see images/app/Dockerfile.prod.dockerignore (BuildKit
+# reads the per-Dockerfile ignore file; other builds are unaffected).
+# Prereqs, produced beforehand (both already run in containers):
+#   - target/universal/talkyard-server-<version>.zip   (s/d-cli dist)
+#   - images/app/assets/                               (gulp prod bundles)
+#   - target/build-info/                               (s/impl/build-prod-app-image.sh)
+
+ARG TALKYARD_VERSION=WIP
+
 # Building sqlx in Debian 13 (Trixie), and using from Ubuntu 24 (Noble)
 # should be fine, because Ubuntu 24 is based on Debian 13 — so shouldn't be
 # any wrong-libc errors or anything weird.
@@ -5,9 +23,38 @@
 # (Rust has only Debian based images, Temurin (for Java) has only Ubuntu
 # based images.)
 #
-FROM rust:1.93.0-trixie AS rust_img
+# Same rust version as Dockerfile.dev. (1.93 broke 2026-07: unpinned
+# 'cargo install sqlx-cli' started resolving to sqlx-cli 0.9.0, which needs
+# rustc >= 1.94.) sqlx-cli pinned to what the published images ship.
+FROM rust:1.94.0-trixie AS rust_img
 
-RUN cargo install sqlx-cli --no-default-features --features native-tls,postgres
+RUN cargo install sqlx-cli --version =0.8.6 --no-default-features --features native-tls,postgres
+
+
+# Unpack the Play dist zip and split it up the way the final image wants it.
+# Same Debian version as the rendr/backup images.
+FROM debian:13.3-slim AS dist_prep
+ARG TALKYARD_VERSION
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends unzip && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY target/universal/talkyard-server-${TALKYARD_VERSION}.zip /tmp/dist.zip
+
+# Move our own JARs to a separate folder, so they can be copied in a separate
+# Dockerfile COPY step, so that when pushing/pulling to/from Docker Hub, only
+# the very last COPY will usually have to be pushed (and pulled by others).
+RUN cd /tmp && \
+    unzip -q dist.zip && \
+    mv talkyard-server-${TALKYARD_VERSION} /dist-app && \
+    mkdir /dist-lib-talkyard && \
+    mv /dist-app/lib/*debiki*          /dist-lib-talkyard/ && \
+    mv /dist-app/lib/*talkyard-server* /dist-lib-talkyard/ && \
+    mv /dist-app/bin  /dist-bin && \
+    mv /dist-app/conf /dist-conf && \
+    # This readme is for the development repo. Create another one, if any, for prod.
+    rm /dist-app/README.md
 
 
 # Ubuntu 24.04. See: https://hub.docker.com/_/eclipse-temurin, and ./Dockerfile.dev .
@@ -70,21 +117,21 @@ RUN mkdir -p /var/talkyard/v1/pub-files/ && \
     chown appuser:appgroup /var/talkyard/v1/pub-files/ && \
     chown appuser:appgroup /var/talkyard/v1/priv-files/
 
-# Frequently modified JARs have been moved to app-lib-talkyard/ and we here copy them in a
+# Frequently modified JARs have been moved to /dist-lib-talkyard and we here copy them in a
 # separate step, so only that step will have to be pushed/pulled to/from Docker Hub.
-COPY app              /opt/talkyard/app
-COPY app-lib-talkyard /opt/talkyard/app/lib/
-COPY app-bin          /opt/talkyard/app/bin/
+COPY --from=dist_prep /dist-app              /opt/talkyard/app
+COPY --from=dist_prep /dist-lib-talkyard     /opt/talkyard/app/lib/
+COPY --from=dist_prep /dist-bin              /opt/talkyard/app/bin/
 # Only copy *-prod files. Other stuff might contain private things, e.g. override.conf might
 # contain test suite OpenAuth credentials.
-COPY app-conf/app-prod.conf     /opt/talkyard/app/conf/
-COPY app-conf/logback-prod.xml  /opt/talkyard/app/conf/
-COPY migrations      /opt/talkyard/app/migrations/
-COPY version.txt     /opt/talkyard/app/
-COPY build-info      /opt/talkyard/build-info/
+COPY --from=dist_prep /dist-conf/app-prod.conf     /opt/talkyard/app/conf/
+COPY --from=dist_prep /dist-conf/logback-prod.xml  /opt/talkyard/app/conf/
+COPY images/app/migrations  /opt/talkyard/app/migrations/
+COPY version.txt            /opt/talkyard/app/
+COPY target/build-info      /opt/talkyard/build-info/
 
 # The Scala code loads Javascript for server side rendering, from here. [APPJSPATH]
-COPY assets /opt/talkyard/app/assets
+COPY images/app/assets /opt/talkyard/app/assets
 
 
 ENV PLAY_HEAP_MEMORY_MB=1024
@@ -121,8 +168,8 @@ HEALTHCHECK \
     # but then: 404 Not Found, because we didn't specify the hostname of a forum. Oh well.
 
 
-COPY entrypoint.prod.sh \
-     chown-postgres_password.sh \
+COPY images/app/entrypoint.prod.sh \
+     images/app/chown-postgres_password.sh \
      /ty/
 
 ENTRYPOINT ["/ty/entrypoint.prod.sh"]
