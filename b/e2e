@@ -12,10 +12,27 @@
 # --shard N/M. Specs are bucketed by browser count (1br/2br/3br/4br) and
 # round-robined within each bucket, so shards stay balanced and each group
 # still runs with the right --Nbr flag.
+# --isolated (first arg): target the private dind daemon from b/build
+# --isolated — the runner then runs INSIDE that daemon with its host
+# networking, i.e. the network namespace where the isolated stack's ports
+# live. Use when the stack itself was started with b/build --isolated.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 repo="$(pwd)"
+
+net_flag="--network=host"
+if [ "${1:-}" = "--isolated" ]; then
+  shift
+  . b/impl/dind-lib.sh
+  ensure_dind "$repo"
+  # Talk to the private daemon by bridge IP (the container name doesn't
+  # resolve from the host). The runner container below then gets 'host'
+  # networking *of the dind daemon* — the netns where the isolated stack's
+  # ports live.
+  DOCKER_HOST="$(dind_host_docker_host)"
+  export DOCKER_HOST
+fi
 
 echo "b/e2e: building ty-e2e-runner image ..." >&2
 docker build -t ty-e2e-runner "$repo/images/e2e-runner" >&2
@@ -24,7 +41,7 @@ tty_flag=""
 if [ -t 0 ] && [ -t 1 ]; then tty_flag="-t"; fi
 
 exec docker run --rm -i $tty_flag \
-  --network=host \
+  $net_flag \
   -v "$repo":"$repo" \
   -w "$repo" \
   -e "HOST_UID=$(id -u)" \

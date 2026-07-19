@@ -12,6 +12,13 @@
 # HOST path. Therefore the repo is mounted at its own host absolute path and
 # the workdir is set to the same path.
 #
+# Flags (must come first):
+#   --isolated        run against a PRIVATE docker daemon (docker:dind) instead
+#                     of the host daemon: host ports stay free, the prod
+#                     build's no-unrelated-containers check always passes.
+#                     First run is cold (own image cache, kept in a volume).
+#   --clean-isolated  remove the dind container + its cache volume, and exit.
+#
 # Env knobs:
 #   TY_BUILD_HEAP_MB   sbt/Play heap for test runs (default: s/d-cli's logic,
 #                      min 5120; prod builds use 8192)
@@ -19,6 +26,15 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 repo="$(pwd)"
+
+isolated=""
+if [ "${1:-}" = "--isolated" ]; then
+  isolated=1; shift
+elif [ "${1:-}" = "--clean-isolated" ]; then
+  . b/impl/dind-lib.sh
+  clean_dind
+  exit 0
+fi
 
 sock=/var/run/docker.sock
 if [ ! -S "$sock" ]; then
@@ -39,6 +55,22 @@ if [ -t 0 ] && [ -t 1 ]; then tty_flag="-t"; fi
 heap_env=()
 if [ -n "${TY_BUILD_HEAP_MB:-}" ]; then
   heap_env=(-e "PLAY_HEAP_MEMORY_MB=${TY_BUILD_HEAP_MB}")
+fi
+
+if [ -n "$isolated" ]; then
+  . b/impl/dind-lib.sh
+  ensure_dind "$repo"
+  # Talk to the private daemon over the bridge net — no socket mount, so
+  # nothing here can touch the host daemon.
+  exec docker run --rm -i $tty_flag \
+    -v "$repo":"$repo" \
+    -w "$repo" \
+    --network "$TY_DIND_NET" \
+    -e "DOCKER_HOST=$TY_DIND_DOCKER_HOST" \
+    -e "HOST_UID=$(id -u)" \
+    -e "HOST_GID=$(id -g)" \
+    "${heap_env[@]}" \
+    ty-builder "$@"
 fi
 
 exec docker run --rm -i $tty_flag \
