@@ -4,3 +4,7 @@
 services:
   web:
     ports: !reset []
+  # Redis's arm64-only kernel-CoW-bug probe false-positives under qemu and
+  # exits — suppress for the emulated smoke (real ARM hardware passes it).
+  cache:
+    command: ["redis-server", "--ignore-warnings", "ARM64-COW-BUG"]
