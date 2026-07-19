@@ -26,14 +26,14 @@ ARG TALKYARD_VERSION=WIP
 # Same rust version as Dockerfile.dev. (1.93 broke 2026-07: unpinned
 # 'cargo install sqlx-cli' started resolving to sqlx-cli 0.9.0, which needs
 # rustc >= 1.94.) sqlx-cli pinned to what the published images ship.
-FROM rust:1.94.0-trixie AS rust_img
+FROM rust:1.94.0-trixie@sha256:f17e723020f87c1b4ac4ff6d73c9dfbb7d5cb978754c76641e47337d65f61e12 AS rust_img
 
 RUN cargo install sqlx-cli --version =0.8.6 --no-default-features --features native-tls,postgres
 
 
 # Unpack the Play dist zip and split it up the way the final image wants it.
 # Same Debian version as the rendr/backup images.
-FROM debian:13.3-slim AS dist_prep
+FROM debian:13.3-slim@sha256:1d3c811171a08a5adaa4a163fbafd96b61b87aa871bbc7aa15431ac275d3d430 AS dist_prep
 ARG TALKYARD_VERSION
 
 RUN apt-get update && \
@@ -58,7 +58,7 @@ RUN cd /tmp && \
 
 
 # Ubuntu 24.04. See: https://hub.docker.com/_/eclipse-temurin, and ./Dockerfile.dev .
-FROM  eclipse-temurin:11.0.30_7-jdk-noble
+FROM  eclipse-temurin:11.0.30_7-jdk-noble@sha256:ea378fb196b21701876861eeac0cd4981a3d7e551f17dacabc8caed7f478d21b
 
 LABEL org.opencontainers.image.title="Talkyard App" \
       io.talkyard.edition="se" \

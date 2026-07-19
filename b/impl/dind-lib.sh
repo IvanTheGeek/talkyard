@@ -14,14 +14,35 @@
 TY_DIND_NAME=ty-dind
 TY_DIND_NET=ty-build-net
 TY_DIND_VOL=ty-dind-cache
-# Same engine major as the host; pinned exactly in the hermetic pass (S6).
-TY_DIND_IMAGE=docker:29-dind
+
+# TY_DIND_OFFLINE=1: hermetic mode — the dind daemon goes on an *internal*
+# bridge (no NAT, no egress), but reuses the same image-cache volume a
+# previous online run populated. Any step that tries to fetch anything
+# fails fast, proving the vendored inputs are complete. Separate container
+# and network names, so online and offline daemons can't be confused.
+if [ -n "${TY_DIND_OFFLINE:-}" ]; then
+  TY_DIND_NAME=ty-dind-offline
+  TY_DIND_NET=ty-build-net-offline
+fi
+# Digest-pinned (b/pin-digests); same engine major as typical hosts.
+TY_DIND_IMAGE=docker:29-dind@sha256:bfec1f5159c63a81ca6fdedbd81404d2c0e16378ed0feec3bb3fbf3998847659
 TY_DIND_DOCKER_HOST=tcp://$TY_DIND_NAME:2375
 
 ensure_dind() {
   local repo="$1"
+  local net_opts=()
+  [ -n "${TY_DIND_OFFLINE:-}" ] && net_opts=(--internal)
   docker network inspect "$TY_DIND_NET" >/dev/null 2>&1 \
-    || docker network create "$TY_DIND_NET" >/dev/null
+    || docker network create "${net_opts[@]}" "$TY_DIND_NET" >/dev/null
+
+  # The cache volume can back only ONE running dockerd — stop the other-mode
+  # daemon (online vs offline) before starting this one.
+  local other=ty-dind
+  [ -z "${TY_DIND_OFFLINE:-}" ] && other=ty-dind-offline
+  if docker ps -a --format '{{.Names}}' | grep -qx "$other"; then
+    echo "dind: removing $other first (the cache volume can back only one daemon)" >&2
+    docker rm -f "$other" >/dev/null
+  fi
 
   if ! docker ps --format '{{.Names}}' | grep -qx "$TY_DIND_NAME"; then
     docker rm -f "$TY_DIND_NAME" >/dev/null 2>&1 || true

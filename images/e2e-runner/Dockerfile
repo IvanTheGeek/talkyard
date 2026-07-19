@@ -8,7 +8,7 @@
 # The wdio config picks up the container specifics via TY_E2E_* env vars
 # ([ty_e2e_env] in tests/e2e-wdio7/wdio.conf.ts) — set by b/e2e.
 
-FROM node:24.14.0-trixie-slim
+FROM node:24.14.0-trixie-slim@sha256:8c8f12cedb96c3b59642cf30d713943c2b223990c9919b96a141681f62e6e292
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -16,7 +16,7 @@ RUN apt-get update \
       chromium chromium-driver dnsmasq \
  && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g pnpm@10
+RUN npm install -g pnpm@10.34.5
 
 # The chromedriver npm package's postinstall downloads a driver binary we
 # never use (we point wdio at /usr/bin/chromedriver) — skip the download.

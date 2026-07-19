@@ -1,5 +1,5 @@
 # See: https://hub.docker.com/_/postgres/tags?name=18.
-FROM postgres:18.3-trixie
+FROM postgres:18.3-trixie@sha256:7e32e9833a6fb1c92c32552794cb6ed569d51b445a54907d35fc112ef39684db
 
 LABEL org.opencontainers.image.title="Talkyard Rdb" \
       io.talkyard.edition="se" \

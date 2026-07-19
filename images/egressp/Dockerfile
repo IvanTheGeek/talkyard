@@ -2,7 +2,7 @@
 # ------------------------------------------------------------
 
 # Images list: https://hub.docker.com/_/golang
-FROM golang:1.26.1-trixie AS smokescreen_builder
+FROM golang:1.26.1-trixie@sha256:1d414b0376b53ec94b9a2493229adb81df8b90af014b18619732f1ceaaf7234a AS smokescreen_builder
 
 # Weird, Smokescreen has no up-to-date Git tags. But commit eae8104, Jan 9 2026, is:
 # "Prevent smokescreen upstream connections to its local IPs", which seems important!
@@ -14,7 +14,7 @@ RUN go install github.com/stripe/smokescreen@464b1115f802cbd91ffee555a41e7154664
 # ------------------------------------------------------------
 
 # Images list: https://hub.docker.com/_/debian/tags?name=13
-FROM debian:13.3-slim
+FROM debian:13.3-slim@sha256:1d3c811171a08a5adaa4a163fbafd96b61b87aa871bbc7aa15431ac275d3d430
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
