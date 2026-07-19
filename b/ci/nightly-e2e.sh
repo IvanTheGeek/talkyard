@@ -25,9 +25,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "=== stack up (isolated dind) ==="
-b/build --isolated bash -c 'sudo docker compose build nodejs app rendr cache rdb search egressp && sudo docker compose up -d' \
+echo "=== images + compile (big heap — a cold clone full-compiles; compose's
+# default 2800 MB heap GC-thrashes on that, so use the s/d-cli path which
+# floors the heap) ==="
+b/build --isolated bash -c 'sudo docker compose build nodejs app rendr cache rdb search egressp' \
   > "$logs/stack-up.log" 2>&1
+TY_BUILD_HEAP_MB=6144 b/build --isolated bash -c 's/d-cli compile < /dev/null' \
+  > "$logs/compile.log" 2>&1 || { echo "compile FAILED:"; tail -20 "$logs/compile.log"; exit 1; }
+
+echo "=== stack up (isolated dind) ==="
+b/build --isolated bash -c 'sudo docker compose up -d' \
+  >> "$logs/stack-up.log" 2>&1
 
 echo "=== waiting for server (cold CI clone = full dev-mode compile, can take 30+ min) ==="
 ready=""
@@ -38,7 +46,11 @@ for i in $(seq 1 480); do
   [ $(( i % 24 )) -eq 0 ] && echo "  still compiling/starting (~$(( i * 5 / 60 )) min)"
   sleep 5
 done
-[ -z "$ready" ] && { echo "server never became ready"; tail -50 "$logs/stack-up.log"; exit 1; }
+if [ -z "$ready" ]; then
+  echo "server never became ready; app container log tail:"
+  docker exec "$TY_DIND_NAME" docker logs --tail 40 tyd1-app-1 2>&1 | tail -40
+  exit 1
+fi
 
 rc=0
 
