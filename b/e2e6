@@ -1,0 +1,62 @@
+#!/bin/bash
+# Run the LEGACY wdio6 e2e suite (tests/e2e/, node 14) in the
+# ty-e2e-wdio6-runner container — host needs only Docker. Starts the
+# matching browser container (tye2ebrowser: selenium/standalone-chrome,
+# Chrome ~86, on :4444) if not already running. The Talkyard stack must
+# already be up with ports 80/443.
+#
+#   b/e2e6 --spec all-links                 # smoke: just these specs
+#   b/e2e6 --shard 2/4                      # this shard of the suite
+#   b/e2e6 --dry-run                        # list what would run
+#
+# --isolated (first arg): target the b/build --isolated dind daemon.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+repo="$(pwd)"
+
+net_flag="--network=host"
+if [ "${1:-}" = "--isolated" ]; then
+  shift
+  . b/impl/dind-lib.sh
+  ensure_dind "$repo"
+  DOCKER_HOST="$(dind_host_docker_host)"
+  export DOCKER_HOST
+fi
+
+# The browser container: selenium + Chrome ~86 — deliberately the 2020 image
+# upstream's d/selenium pins; it version-matches this suite's chromedriver 86
+# expectations. Digest-pinned like everything else.
+selenium_img="selenium/standalone-chrome:4.0.0-alpha-7-prerelease-20201009@sha256:e4d30c0c84df9963a79116f216ffacfe0d20aa4c5c7d3ec3ddc31ecd2ea81be3"
+if ! docker ps --format '{{.Names}}' | grep -qx tye2ebrowser; then
+  docker rm -f tye2ebrowser >/dev/null 2>&1 || true
+  echo "b/e2e6: starting tye2ebrowser (selenium + Chrome 86) ..." >&2
+  docker run -d --name tye2ebrowser --network=host \
+    -e SCREEN_WIDTH=1850 -e SCREEN_HEIGHT=1100 -e VNC_NO_PASSWORD=1 \
+    -v /dev/shm:/dev/shm \
+    "$selenium_img" >/dev/null
+fi
+for i in $(seq 1 30); do
+  if docker exec tye2ebrowser bash -c 'curl -s -o /dev/null http://127.0.0.1:4444/wd/hub/status' 2>/dev/null; then
+    break
+  fi
+  sleep 2
+done
+
+runner_img="${TY_E2E_WDIO6_RUNNER_IMG:-ty-e2e-wdio6-runner}"
+if [ -z "${TY_E2E_WDIO6_RUNNER_IMG:-}" ]; then
+  echo "b/e2e6: building ty-e2e-wdio6-runner image ..." >&2
+  docker build -t ty-e2e-wdio6-runner "$repo/images/e2e-wdio6-runner" >&2
+fi
+
+tty_flag=""
+if [ -t 0 ] && [ -t 1 ]; then tty_flag="-t"; fi
+
+exec docker run --rm -i $tty_flag \
+  $net_flag \
+  -v "$repo":"$repo" \
+  -w "$repo" \
+  -e "HOST_UID=$(id -u)" \
+  -e "HOST_GID=$(id -g)" \
+  -e TY_E2E_REMOTE_SELENIUM=1 \
+  "$runner_img" b/impl/e2e-wdio6.sh "$@"
