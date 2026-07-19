@@ -66,3 +66,32 @@ gate; the nightly full run keeps measuring the whole suite. Two categories
 are recoverable later: webhooks (start `fakeweb` via
 `docker compose --profile e2etests up -d fakeweb`) and non-Gatsby embcom
 (add an http-server sidecar to the runner image).
+
+## Dual-arch (amd64 + arm64)
+
+The chain can produce the runtime images for linux/arm64 (Raspberry Pi,
+Apple Silicon, arm64 cloud) as well as native amd64:
+
+- `b/build [--isolated] --arch arm64 make prod-images-skip-tests` — exports
+  `TY_TARGET_ARCH=arm64`; s/impl/build-prod-images.sh scopes it (as
+  `DOCKER_DEFAULT_PLATFORM`) to the RUNTIME image builds only — gulp, sbt
+  and the dev images stay native; their outputs are arch-independent. The
+  arch-specific layers (OpenResty compile, sqlx-cli cargo build, ES plugin
+  install, apt/apk) build under qemu/binfmt — install `qemu-user-static`
+  once on the build box; layer caching makes rebuilds cheap.
+- `TY_REUSE_APP_DIST=1` skips sbt test+dist when `target/universal/*.zip`
+  already exists — for a second-arch pass right after a native build.
+- Publishing: the build tags images `:latest` in the building daemon (same
+  as amd64). `b/publish-runtime-images <prefix> <tag>` pushes all eight
+  runtime images from the CURRENT daemon (set `DOCKER_HOST` at the dind
+  daemon for --isolated builds) — use per-arch tags
+  `<version>-<sha>-amd64|-arm64`, then `b/stitch-manifests <prefix>
+  <version>-<sha>` merges them registry-side into one multi-arch tag, so
+  any machine pulls its own arch automatically.
+- CI: `.forgejo/workflows/nightly-arm64.yml` (00:30, change-guarded) builds
+  arm64 inside the CI dind, boot-smokes the stack emulated (app healthcheck
+  + `uname -m` == aarch64) and pushes `-arm64` tags. The monthly probe
+  asserts qemu binfmt keeps working on the runner.
+- The one arch-pinned base was images/search's ES tag (`9.3.1-amd64`), now
+  the multi-arch `9.3.1` index digest. b/pin-digests pins manifest-LIST
+  digests, so pins stay arch-neutral across the board.

@@ -1,0 +1,6 @@
+# Overlay for the nightly-arm64 boot smoke: don't publish web's 80/443 even
+# inside the dind daemon — nightly-e2e's dev stack may hold them if the two
+# nightlies overlap. The smoke only needs the app healthcheck + docker exec.
+services:
+  web:
+    ports: !reset []

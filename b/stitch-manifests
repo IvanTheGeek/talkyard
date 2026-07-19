@@ -1,0 +1,29 @@
+#!/bin/bash
+# Merge per-arch runtime-image tags into ONE multi-arch manifest-list tag,
+# so consumers `docker pull <prefix>/talkyard-app:<tag>` and automatically
+# get their own arch:
+#
+#   b/stitch-manifests <registry-prefix> <tag> [arch ...]
+#   e.g.  b/stitch-manifests forgejo.ivanthegeek.com/ivan v1.2026.004-e80b4519d amd64 arm64
+#
+# Expects <prefix>/talkyard-<svc>:<tag>-<arch> to already exist in the
+# registry for every arch given (pushed by b/publish-runtime-images).
+# Registry-side only (docker buildx imagetools) — no local images involved.
+# Archs default to: amd64 arm64.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+prefix="${1:?usage: b/stitch-manifests <registry-prefix> <tag> [arch ...]}"
+tag="${2:?usage: b/stitch-manifests <registry-prefix> <tag> [arch ...]}"
+shift 2
+archs=("$@")
+if [ ${#archs[@]} -eq 0 ]; then archs=(amd64 arm64); fi
+
+for svc in app web rendr cache rdb search egressp backup; do
+  srcs=()
+  for a in "${archs[@]}"; do srcs+=("$prefix/talkyard-$svc:$tag-$a"); done
+  echo "=== stitch $prefix/talkyard-$svc:$tag  <-  ${srcs[*]}"
+  docker buildx imagetools create -t "$prefix/talkyard-$svc:$tag" "${srcs[@]}"
+done
+echo "=== done (archs: ${archs[*]})"

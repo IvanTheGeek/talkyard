@@ -9,7 +9,10 @@
 
 # Image list: https://www.docker.elastic.co/r/elasticsearch
 # Docs: https://www.elastic.co/docs/deploy-manage/deploy/self-managed/install-elasticsearch-with-docker
-FROM docker.elastic.co/elasticsearch/elasticsearch:9.3.1-amd64@sha256:6e63901da2004a0ef1f1e907a522bb32e134ee8dd9c8c6dc1671c3ca467061ec
+# The plain 9.3.1 tag is a multi-arch manifest LIST (amd64 + arm64) — the
+# digest below pins that list, and platform resolution happens at pull/build
+# time, so cross-arch builds (TY_TARGET_ARCH / b/build --arch) work too.
+FROM docker.elastic.co/elasticsearch/elasticsearch:9.3.1@sha256:cb637acad8808664b7c57455a2b2ee87e30b3cab210f3ccc423ff6bcc305e0b9
 
 LABEL org.opencontainers.image.title="Talkyard Search" \
       io.talkyard.edition="se" \

@@ -18,23 +18,41 @@
 #                     build's no-unrelated-containers check always passes.
 #                     First run is cold (own image cache, kept in a volume).
 #   --clean-isolated  remove the dind container + its cache volume, and exit.
+#   --arch <arch>     build the RUNTIME images for another CPU arch, e.g.
+#                     `--arch arm64`: exports TY_TARGET_ARCH, which the prod
+#                     build scripts scope to the runtime-image builds only
+#                     (gulp/sbt and the dev images stay native — their output
+#                     is arch-independent). Foreign-arch layers build via
+#                     qemu/binfmt: install qemu-user-static on the box once.
 #
 # Env knobs:
 #   TY_BUILD_HEAP_MB   sbt/Play heap for test runs (default: s/d-cli's logic,
 #                      min 5120; prod builds use 8192)
+#   TY_REUSE_APP_DIST  skip sbt test+dist when target/universal/*.zip already
+#                      exists — for a second-arch pass right after a native
+#                      build (passed through into the builder).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 repo="$(pwd)"
 
 isolated=""
-if [ "${1:-}" = "--isolated" ]; then
-  isolated=1; shift
-elif [ "${1:-}" = "--clean-isolated" ]; then
-  . b/impl/dind-lib.sh
-  clean_dind
-  exit 0
-fi
+target_arch="${TY_TARGET_ARCH:-}"
+while :; do
+  case "${1:-}" in
+    --isolated)
+      isolated=1; shift ;;
+    --clean-isolated)
+      . b/impl/dind-lib.sh
+      clean_dind
+      exit 0 ;;
+    --arch)
+      target_arch="${2:?b/build: --arch needs a value, e.g.: --arch arm64}"
+      shift 2 ;;
+    *)
+      break ;;
+  esac
+done
 
 sock=/var/run/docker.sock
 if [ ! -S "$sock" ]; then
@@ -60,6 +78,12 @@ if [ -t 0 ] && [ -t 1 ]; then tty_flag="-t"; fi
 heap_env=()
 if [ -n "${TY_BUILD_HEAP_MB:-}" ]; then
   heap_env=(-e "PLAY_HEAP_MEMORY_MB=${TY_BUILD_HEAP_MB}")
+fi
+if [ -n "$target_arch" ]; then
+  heap_env+=(-e "TY_TARGET_ARCH=$target_arch")
+fi
+if [ -n "${TY_REUSE_APP_DIST:-}" ]; then
+  heap_env+=(-e "TY_REUSE_APP_DIST=$TY_REUSE_APP_DIST")
 fi
 
 if [ -n "$isolated" ]; then

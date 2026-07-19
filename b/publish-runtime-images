@@ -1,0 +1,34 @@
+#!/bin/bash
+# Push the eight RUNTIME images (talkyard-app, -web, -rendr, -cache, -rdb,
+# -search, -egressp, -backup) from the CURRENT docker daemon to a registry:
+#
+#   b/publish-runtime-images <registry-prefix> <tag>
+#   e.g.  b/publish-runtime-images forgejo.ivanthegeek.com/ivan v1.2026.004-e80b4519d-arm64
+#
+# Respects DOCKER_HOST — point it at the dind daemon to publish images built
+# with `b/build --isolated` (client-side docker logins work over DOCKER_HOST):
+#
+#   . b/impl/dind-lib.sh
+#   DOCKER_HOST="$(dind_host_docker_host)" b/publish-runtime-images <prefix> <tag>
+#
+# The prod build tags images :latest locally (see s/impl/build-prod-images.sh).
+# Per-arch pushes should suffix the tag with -amd64 / -arm64, then
+# b/stitch-manifests merges them into one multi-arch tag.
+# You must be docker-logged-in already. Counterpart for the DEV/builder
+# images: b/push-build-images.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+prefix="${1:?usage: b/publish-runtime-images <registry-prefix> <tag>}"
+tag="${2:?usage: b/publish-runtime-images <registry-prefix> <tag>}"
+reg_org=$(sed -nr 's/DOCKER_REG_ORG=([a-zA-Z0-9\._-]*).*/\1/p' .env)
+
+for svc in app web rendr cache rdb search egressp backup; do
+  local_name="$reg_org/talkyard-$svc:latest"
+  remote="$prefix/talkyard-$svc:$tag"
+  echo "=== push $local_name -> $remote"
+  docker tag "$local_name" "$remote"
+  docker push "$remote"
+done
+echo "=== done: $prefix/talkyard-{app,web,rendr,cache,rdb,search,egressp,backup}:$tag"

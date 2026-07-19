@@ -1,0 +1,19 @@
+# Cross-arch (arm64) prod-image build + emulated boot smoke, inside the CI
+# dind daemon. Change-guarded (skips when HEAD unchanged since last green).
+# Publishes -arm64 tags to the Forgejo registry on success.
+name: nightly-arm64
+on:
+  schedule:
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+jobs:
+  arm64:
+    runs-on: tybuild
+    timeout-minutes: 360
+    steps:
+      - name: Sync CI clone
+        run: $HOME/forgejo-runner/talkyard/b/ci/sync-clone.sh
+      - name: Nightly arm64 build + smoke
+        env:
+          TY_PUBLISH_ARM64: 'forgejo.ivanthegeek.com/ivan'
+        run: $HOME/forgejo-runner/talkyard/b/ci/nightly-arm64.sh

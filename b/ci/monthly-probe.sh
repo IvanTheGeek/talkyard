@@ -30,5 +30,12 @@ curl -fsSI -o /dev/null https://github.com/laverdet/node-fibers/releases && echo
 echo "=== crates.io (sqlx-cli 0.8.6) reachable ==="
 curl -fsS -A 'ty-build-monthly-probe (forgejo.ivanthegeek.com)' -o /dev/null https://crates.io/api/v1/crates/sqlx-cli/0.8.6 && echo "ok    crates.io sqlx-cli 0.8.6" || { echo "FAIL  crates.io"; fail=1; }
 
+echo "=== arm64 emulation (binfmt/qemu) on this runner ==="
+if [ "$(docker run --rm --platform linux/arm64 alpine:3.22.3 uname -m 2>/dev/null || true)" = "aarch64" ]; then
+  echo "ok    linux/arm64 emulation"
+else
+  echo "FAIL  linux/arm64 emulation — install qemu-user-static on the runner box"; fail=1
+fi
+
 if [ $fail -eq 0 ]; then echo "monthly-probe: all pinned inputs available."; else echo "monthly-probe: SOME INPUTS UNAVAILABLE — vendor or re-pin before they rot further."; fi
 exit $fail

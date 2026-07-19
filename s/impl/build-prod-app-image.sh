@@ -33,7 +33,15 @@ git describe --exact-match --tags &> target/build-info/git-describe-exact-tags.t
 set -e
 
 img_tag="$reg_org/talkyard-app:latest"
+
+# Cross-arch build? (See TY_TARGET_ARCH in s/impl/build-prod-images.sh.)
+platform_arg=""
+if [ -n "${TY_TARGET_ARCH:-}" ]; then
+  platform_arg="--platform=linux/${TY_TARGET_ARCH}"
+fi
+
 docker build \
+    $platform_arg \
     --tag=$img_tag \
     --file images/app/Dockerfile.prod \
     --build-arg TALKYARD_VERSION=$version \
