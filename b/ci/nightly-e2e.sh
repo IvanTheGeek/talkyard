@@ -28,7 +28,7 @@ trap cleanup EXIT
 echo "=== images + compile (big heap — a cold clone full-compiles; compose's
 # default 2800 MB heap GC-thrashes on that, so use the s/d-cli path which
 # floors the heap) ==="
-b/build --isolated bash -c 'sudo docker compose build nodejs app rendr cache rdb search egressp' \
+b/build --isolated bash -c 'sudo docker compose build nodejs app rendr cache rdb search egressp web' \
   > "$logs/stack-up.log" 2>&1
 TY_BUILD_HEAP_MB=6144 b/build --isolated bash -c 's/d-cli compile < /dev/null' \
   > "$logs/compile.log" 2>&1 || { echo "compile FAILED:"; tail -20 "$logs/compile.log"; exit 1; }

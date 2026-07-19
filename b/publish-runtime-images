@@ -24,9 +24,25 @@ prefix="${1:?usage: b/publish-runtime-images <registry-prefix> <tag>}"
 tag="${2:?usage: b/publish-runtime-images <registry-prefix> <tag>}"
 reg_org=$(sed -nr 's/DOCKER_REG_ORG=([a-zA-Z0-9\._-]*).*/\1/p' .env)
 
+# A per-arch tag suffix is a promise — verify the images actually are that
+# arch (:latest is mutable shared state; a preceding other-arch build pass
+# could have overwritten it).
+case "$tag" in
+  *-amd64) want_arch=amd64 ;;
+  *-arm64) want_arch=arm64 ;;
+  *)       want_arch='' ;;
+esac
+
 for svc in app web rendr cache rdb search egressp backup; do
   local_name="$reg_org/talkyard-$svc:latest"
   remote="$prefix/talkyard-$svc:$tag"
+  if [ -n "$want_arch" ]; then
+    arch="$(docker image inspect -f '{{.Architecture}}' "$local_name")"
+    if [ "$arch" != "$want_arch" ]; then
+      echo "REFUSING to push $local_name as $remote: image arch is '$arch'." >&2
+      exit 1
+    fi
+  fi
   echo "=== push $local_name -> $remote"
   docker tag "$local_name" "$remote"
   docker push "$remote"

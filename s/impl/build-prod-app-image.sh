@@ -47,4 +47,12 @@ docker build \
     --build-arg TALKYARD_VERSION=$version \
     .
 
+if [ -n "${TY_TARGET_ARCH:-}" ]; then
+  arch="$(docker image inspect -f '{{.Architecture}}' $img_tag)"
+  if [ "$arch" != "$TY_TARGET_ARCH" ]; then
+    echo "App image $img_tag is '$arch', expected '$TY_TARGET_ARCH' — cross-arch build bug."
+    exit 1
+  fi
+fi
+
 echo "Image tag: $img_tag"

@@ -73,25 +73,48 @@ The chain can produce the runtime images for linux/arm64 (Raspberry Pi,
 Apple Silicon, arm64 cloud) as well as native amd64:
 
 - `b/build [--isolated] --arch arm64 make prod-images-skip-tests` — exports
-  `TY_TARGET_ARCH=arm64`; s/impl/build-prod-images.sh scopes it (as
-  `DOCKER_DEFAULT_PLATFORM`) to the RUNTIME image builds only — gulp, sbt
-  and the dev images stay native; their outputs are arch-independent. The
-  arch-specific layers (OpenResty compile, sqlx-cli cargo build, ES plugin
-  install, apt/apk) build under qemu/binfmt — install `qemu-user-static`
-  once on the build box; layer caching makes rebuilds cheap.
+  `TY_TARGET_ARCH=arm64`. Ordering in s/impl/build-prod-images.sh: the
+  runtime images first build NATIVE (sbt's dev-app service depends_on
+  rendr/cache/rdb/search/egressp — the unit tests must run against native
+  containers), then gulp/sbt run native (their outputs are
+  arch-independent), and only afterwards do the runtime images rebuild
+  cross-arch (as `DOCKER_DEFAULT_PLATFORM`, with `COMPOSE_PROFILES=backup`
+  — compose does NOT apply the platform env to a profile-gated service
+  that's merely named on the CLI, so without the profile, backup silently
+  builds native). Every produced image's `.Architecture` is asserted
+  against the target — a wrong-arch image fails the build, not the Pi.
+  The arch-specific layers (OpenResty compile, sqlx-cli cargo build, ES
+  plugin install, apt/apk) build under qemu/binfmt — install
+  `qemu-user-static` once on the build box; layer caching makes rebuilds
+  cheap.
+- With `--isolated`, a cross-arch build gets its OWN dind
+  (`ty-dind-<arch>` by default): `:latest` tags are per-daemon mutable
+  state, and sharing a daemon would overwrite the native tags that e2e
+  stacks and sbt dependency services boot from.
 - `TY_REUSE_APP_DIST=1` skips sbt test+dist when `target/universal/*.zip`
-  already exists — for a second-arch pass right after a native build.
+  already exists AND was built at the current commit (recorded in
+  `target/universal/DIST_GIT_REV`; mismatch = loud rebuild) — for a
+  second-arch pass right after a native build.
 - Publishing: the build tags images `:latest` in the building daemon (same
   as amd64). `b/publish-runtime-images <prefix> <tag>` pushes all eight
   runtime images from the CURRENT daemon (set `DOCKER_HOST` at the dind
-  daemon for --isolated builds) — use per-arch tags
-  `<version>-<sha>-amd64|-arm64`, then `b/stitch-manifests <prefix>
-  <version>-<sha>` merges them registry-side into one multi-arch tag, so
-  any machine pulls its own arch automatically.
-- CI: `.forgejo/workflows/nightly-arm64.yml` (00:30, change-guarded) builds
-  arm64 inside the CI dind, boot-smokes the stack emulated (app healthcheck
-  + `uname -m` == aarch64) and pushes `-arm64` tags. The monthly probe
-  asserts qemu binfmt keeps working on the runner.
+  daemon for --isolated builds); an `-amd64`/`-arm64` tag suffix is
+  verified against each image's real architecture before pushing. Then
+  `b/stitch-manifests <prefix> <version>-<sha>` merges the per-arch tags
+  registry-side into one multi-arch tag, so any machine pulls its own arch
+  automatically.
+- CI: `.forgejo/workflows/nightly-arm64.yml` (00:30, change-guarded;
+  manual dispatch sets TY_FORCE) builds arm64 inside a DEDICATED CI dind
+  (`ty-dind-ci-arm64`), boot-smokes the stack emulated (app healthcheck +
+  `uname -m` == aarch64) and pushes `-arm64` tags. The monthly probe
+  asserts qemu binfmt keeps working on the runner. Deployment prereqs:
+  the workflow only runs once merged to docker-only-build (sync-clone
+  fetches that branch; SHA-dispatch of other branches is attempted
+  best-effort); the runner config.yml task `timeout` (was 3h) and the
+  Forgejo instance's own 3h default job timeout must exceed a cold arm64
+  build (~3-5h) — warm-cache runs fit easily; consider priming the
+  `ty-dind-ci-arm64-cache` volume with one manual run before the first
+  scheduled night.
 - The one arch-pinned base was images/search's ES tag (`9.3.1-amd64`), now
   the multi-arch `9.3.1` index digest. b/pin-digests pins manifest-LIST
   digests, so pins stay arch-neutral across the board.

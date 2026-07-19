@@ -16,4 +16,6 @@ jobs:
       - name: Nightly arm64 build + smoke
         env:
           TY_PUBLISH_ARM64: 'forgejo.ivanthegeek.com/ivan'
+          # Manual dispatch = "run it even if HEAD is unchanged".
+          TY_FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
         run: $HOME/forgejo-runner/talkyard/b/ci/nightly-arm64.sh

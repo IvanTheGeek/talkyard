@@ -14,6 +14,13 @@ set -euo pipefail
 . "$(dirname "$0")/env.sh"
 cd "$TY_CI_REPO"
 
+# Own dind context — NOT ty-dind-ci: the arm64 pass overwrites the shared
+# :latest tags (web etc.) that nightly-e2e's dev stack boots from; sharing
+# the daemon would leave e2e fronted by an emulated arm64 nginx forever.
+export TY_DIND_NAME=ty-dind-ci-arm64
+export TY_DIND_NET=ty-build-net-ci-arm64
+export TY_DIND_VOL=ty-dind-ci-arm64-cache
+
 head="$(git rev-parse HEAD)"
 marker="$TY_CI_STATE/last-arm64-green"
 if [ -z "${TY_FORCE:-}" ] && [ -f "$marker" ] && [ "$(cat "$marker")" = "$head" ]; then
@@ -29,11 +36,12 @@ if [ "$(docker run --rm --platform linux/arm64 alpine:3.22.3 uname -m 2>/dev/nul
   exit 1
 fi
 
-# Same file set as the prod-test (tyb1) stack, plus: no published web ports.
+# Prod-test stack file set MINUS debug.yml (it publishes app/cache/rdb/search
+# ports we don't need — the smoke polls via docker exec only), plus: no
+# published web ports either.
 smoke="sudo env VERSION_TAG=latest DOCKER_REG_ORG=debiki POSTGRES_PASSWORD=public \
 docker compose -p tya-smoke \
 -f modules/ed-prod-one-test/docker-compose.yml \
--f modules/ed-prod-one-test/debug.yml \
 -f modules/ed-prod-one-test-override.yml \
 -f docker-compose-no-limits.yml \
 -f b/ci/arm64-smoke-noports.yml"
@@ -42,6 +50,10 @@ cleanup() {
   b/build --isolated bash -c "$smoke down -v" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
+# Also clean at START: a hard-killed (SIGKILL/reboot) previous run can leave
+# the tya-smoke stack running in the dind, which would trip the build's
+# no-unrelated-containers guard.
+cleanup
 
 echo "=== arm64 prod images (runtime images emulated; sbt/gulp native) ==="
 b/build --isolated --arch arm64 make prod-images-skip-tests > "$logs/arm64-build.log" 2>&1 \

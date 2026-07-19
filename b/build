@@ -87,6 +87,15 @@ if [ -n "${TY_REUSE_APP_DIST:-}" ]; then
 fi
 
 if [ -n "$isolated" ]; then
+  if [ -n "$target_arch" ] && [ -z "${TY_DIND_NAME:-}" ]; then
+    # Cross-arch builds get their OWN dind: image caches and the :latest
+    # tags are per-daemon, and sharing a daemon would overwrite the native
+    # :latest tags that other runs (e2e stacks, sbt dependency services)
+    # boot containers from.
+    export TY_DIND_NAME="ty-dind-$target_arch"
+    export TY_DIND_NET="ty-build-net-$target_arch"
+    export TY_DIND_VOL="ty-dind-$target_arch-cache"
+  fi
   . b/impl/dind-lib.sh
   ensure_dind "$repo"
   # Talk to the private daemon over the bridge net — no socket mount, so
