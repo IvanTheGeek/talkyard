@@ -2,50 +2,49 @@
 # Fast PR-check tier: everything a pull request must not break, nothing more.
 #   - git submodules present
 #   - vendored node_modules present (container-pnpm fallback)
+#   - dev images built (compose build; cached = no-op)
 #   - all client TypeScript/Stylus compiles (debug asset bundles, gulp in the
 #     nodejs container)
 #   - Scala compiles and the unit/app test suite runs (sbt in the app
 #     container; the DB etc start automatically via compose depends_on)
 #
-# No minified release bundles, no image builds, no sbt dist, no e2e — that is
-# `make prod-images` territory. Intended invocation:  b/build b/check
-# (works from a nix/host shell too, if you have make + docker).
+# No minified release bundles, no image builds beyond the dev ones, no sbt
+# dist, no e2e — that is `make prod-images` territory. Intended invocation:
+#   b/build b/check          (add --isolated for a private daemon)
+# Emits a per-stage timing/result table on exit (b/impl/stages-lib.sh),
+# also written to target/ty-build-summary.txt for CI artifacts.
 set -o pipefail
 
 cd "$(dirname "$0")/.."
-t0=$(date +%s)
-fail=0
+. b/impl/stages-lib.sh
+ty_stages_init
 
-step() { echo; echo "=== b/check [$(( $(date +%s) - t0 ))s] $* ==="; }
-run()  { "$@"; local rc=$?; [ $rc -ne 0 ] && fail=$rc; return $rc; }
+ty_stage "git submodules"
+make git-subm-init-upd || exit $?
 
-step "git submodules"
-run make git-subm-init-upd || exit $fail
+ty_stage "node_modules (vendored)"
+make node_modules || exit $?
 
-step "node_modules (vendored)"
-run make node_modules || exit $fail
-
-step "dev images (compose build — no-op when cached)"
+ty_stage "dev images (compose build — no-op when cached)"
 # 'docker compose run' does NOT build missing images for services that also
 # have an 'image:' name — on a fresh daemon it tries to PULL debiki/*-dev,
 # which only exist locally. Build explicitly: nodejs (gulp), app (sbt), and
 # app's depends_on services.
-run sudo docker compose build nodejs app rendr cache rdb search egressp || exit $fail
+sudo docker compose build nodejs app rendr cache rdb search egressp || exit $?
 
-step "debug asset bundles (client TS/CSS, gulp in container)"
-run make debug_asset_bundles || exit $fail
+ty_stage "debug asset bundles (client TS/CSS, gulp in container)"
+make debug_asset_bundles || exit $?
 
-step "sbt compile + unit/app tests (in app container)"
+ty_stage "sbt compile + unit/app tests (in app container)"
 # PLAY_HEAP_MEMORY_MB: honored by s/d-cli if set (b/build forwards
 # TY_BUILD_HEAP_MB into it); otherwise s/d-cli defaults with a 5120 MB floor.
-run s/d-cli test < /dev/null
+s/d-cli test < /dev/null
 sbt_rc=$?
 
-step "result"
 if [ $sbt_rc -eq 0 ]; then
-  echo "b/check: OK ($(( $(date +%s) - t0 ))s)"
+  echo "b/check: OK"
 else
-  echo "b/check: sbt test exited $sbt_rc ($(( $(date +%s) - t0 ))s)"
+  echo "b/check: sbt test exited $sbt_rc"
   echo "NOTE: the suite is expected green on main (verified 2026-07-18,"
   echo "996 passed / 0 failed). If render/Nashorn specs fail, check that the"
   echo "debug asset bundles built — those specs need server-bundle.js, which"
