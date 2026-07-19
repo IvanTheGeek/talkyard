@@ -66,6 +66,12 @@ if (browserNameAndOpts.browserName === 'chrome'
     args: [
       '--disable-notifications',
 
+      // In a container or other minimal environment: Chrome's sandbox needs
+      // privileges that aren't available there, and /dev/shm can be tiny.
+      // No-op unless the env var is set (e.g. by b/e2e).  [ty_e2e_env]
+      ...(process.env.TY_E2E_CHROME_NO_SANDBOX
+            ? ['--no-sandbox', '--disable-dev-shm-usage'] : []),
+
       // Make HTTPS snake oil cert work: [E2EHTTPS]
 
       // Seems this is enough:
@@ -115,6 +121,12 @@ if (browserNameAndOpts.browserName === 'chrome'
     // Use --disable-gpu to avoid an error from a missing Mesa library,
     // see: https://chromium.googlesource.com/chromium/src/+/lkgr/headless/README.md.
     opts.args.push('--headless', '--disable-gpu');
+  }
+
+  // Optional non-default browser binary, e.g. /usr/bin/chromium in the
+  // e2e-runner container. No-op unless set.  [ty_e2e_env]
+  if (process.env.TY_E2E_CHROME_BIN) {
+    (opts as any).binary = process.env.TY_E2E_CHROME_BIN;
   }
 
   browserNameAndOpts['goog:chromeOptions'] = opts;
@@ -325,7 +337,15 @@ export const config = { // doesn't work: WebdriverIO.Config = {
   // Does use a Docker container with Chrome — so, can be invisible.
   //
   services: [
-    settings.useChromedriver ? 'chromedriver' : (    // if script flag:  --cd
+    settings.useChromedriver ? ['chromedriver', {    // if script flag:  --cd
+        // Optionally use a system chromedriver — e.g. Debian's
+        // chromium-driver package, which is always version-matched with its
+        // chromium — instead of the npm package's downloaded binary.
+        // No-op (default npm chromedriver) unless set.  [ty_e2e_env]
+        ...(process.env.TY_E2E_CHROMEDRIVER_PATH
+              ? { chromedriverCustomPath: process.env.TY_E2E_CHROMEDRIVER_PATH }
+              : {}),
+        }] as any : (
       settings.useDevtoolsProtocol ? 'devtools' : (  // if script flag:  --dt
         ['selenium-standalone', {                    // else the default
         logPath: 'logs',
