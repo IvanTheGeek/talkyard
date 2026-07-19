@@ -1,0 +1,47 @@
+#!/bin/bash
+# Fast PR-check tier: everything a pull request must not break, nothing more.
+#   - git submodules present
+#   - vendored node_modules present (container-pnpm fallback)
+#   - all client TypeScript/Stylus compiles (debug asset bundles, gulp in the
+#     nodejs container)
+#   - Scala compiles and the unit/app test suite runs (sbt in the app
+#     container; the DB etc start automatically via compose depends_on)
+#
+# No minified release bundles, no image builds, no sbt dist, no e2e — that is
+# `make prod-images` territory. Intended invocation:  b/build b/check
+# (works from a nix/host shell too, if you have make + docker).
+set -o pipefail
+
+cd "$(dirname "$0")/.."
+t0=$(date +%s)
+fail=0
+
+step() { echo; echo "=== b/check [$(( $(date +%s) - t0 ))s] $* ==="; }
+run()  { "$@"; local rc=$?; [ $rc -ne 0 ] && fail=$rc; return $rc; }
+
+step "git submodules"
+run make git-subm-init-upd || exit $fail
+
+step "node_modules (vendored)"
+run make node_modules || exit $fail
+
+step "debug asset bundles (client TS/CSS, gulp in container)"
+run make debug_asset_bundles || exit $fail
+
+step "sbt compile + unit/app tests (in app container)"
+# PLAY_HEAP_MEMORY_MB: honored by s/d-cli if set (b/build forwards
+# TY_BUILD_HEAP_MB into it); otherwise s/d-cli defaults with a 5120 MB floor.
+run s/d-cli test < /dev/null
+sbt_rc=$?
+
+step "result"
+if [ $sbt_rc -eq 0 ]; then
+  echo "b/check: OK ($(( $(date +%s) - t0 ))s)"
+else
+  echo "b/check: sbt test exited $sbt_rc ($(( $(date +%s) - t0 ))s)"
+  echo "NOTE: the suite is expected green on main (verified 2026-07-18,"
+  echo "996 passed / 0 failed). If render/Nashorn specs fail, check that the"
+  echo "debug asset bundles built — those specs need server-bundle.js, which"
+  echo "is why this script builds bundles BEFORE running the tests."
+fi
+exit $sbt_rc

@@ -1,0 +1,52 @@
+#!/bin/bash
+# Docker-only build wrapper. Runs the given command inside the ty-builder
+# container; the host needs only Docker + git.
+#
+#   b/build make prod-images-skip-tests     # full build + unit tests, no e2e
+#   b/build b/check                         # fast PR-check tier
+#   b/build bash                            # interactive shell
+#
+# PATH-IDENTITY CONSTRAINT (do not "fix" this): the container talks to the
+# HOST docker daemon through the mounted socket, so every path docker compose
+# resolves (bind-mount sources like ./:/opt/talkyard/app/) must be a valid
+# HOST path. Therefore the repo is mounted at its own host absolute path and
+# the workdir is set to the same path.
+#
+# Env knobs:
+#   TY_BUILD_HEAP_MB   sbt/Play heap for test runs (default: s/d-cli's logic,
+#                      min 5120; prod builds use 8192)
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+repo="$(pwd)"
+
+sock=/var/run/docker.sock
+if [ ! -S "$sock" ]; then
+  echo "b/build: no docker socket at $sock — install/start Docker first." >&2
+  exit 1
+fi
+if [ "$(id -u)" -eq 0 ]; then
+  echo "b/build: don't run as root (the build scripts refuse root)." >&2
+  exit 1
+fi
+
+echo "b/build: building ty-builder image ..." >&2
+docker build -t ty-builder "$repo/images/builder" >&2
+
+tty_flag=""
+if [ -t 0 ] && [ -t 1 ]; then tty_flag="-t"; fi
+
+heap_env=()
+if [ -n "${TY_BUILD_HEAP_MB:-}" ]; then
+  heap_env=(-e "PLAY_HEAP_MEMORY_MB=${TY_BUILD_HEAP_MB}")
+fi
+
+exec docker run --rm -i $tty_flag \
+  -v "$repo":"$repo" \
+  -w "$repo" \
+  -v "$sock":"$sock" \
+  -e "HOST_UID=$(id -u)" \
+  -e "HOST_GID=$(id -g)" \
+  -e "DOCKER_GID=$(stat -c %g "$sock")" \
+  "${heap_env[@]}" \
+  ty-builder "$@"
