@@ -48,10 +48,12 @@ Decided 2026-07-19; revisit only if upstream changes.
    upstream (`echo "How [pnpm_0_yarn]?"; exit 1` in s/run-e2e-tests.sh), so
    Gatsby embcom specs cannot even build their prerequisites. They are in
    the expected-env-fails list (below).
-5. **wdio6 (tests/e2e/, node 14):** NOT dead — still vital; runs via its own
-   runner container (planned `ty-e2e-wdio6-runner`, see the workspace plan)
-   using upstream's run-the-suite-twice design (the launchers version-skip
-   symmetrically).
+5. **wdio6 (tests/e2e/, node 14):** NOT dead — still vital; runs via
+   `b/e2e6` + the `ty-e2e-wdio6-runner` container (frozen node 14 — ends the
+   node-gyp/fibers host pain) against the pinned `tye2ebrowser` Selenium
+   container (Chrome ~86, matching this suite's chromedriver 86 pins), via
+   the `TY_E2E_REMOTE_SELENIUM` hook in tests/e2e/wdio.conf.ts. One wdio
+   process per spec, exactly like upstream's old runner drove it.
 
 ## The curated e2e green gate
 

@@ -290,11 +290,22 @@ const config: WebdriverIO.Config = {
 
   //services: ['devtools'],
 
+  // [ty_e2e_env] Connect to an ALREADY-RUNNING Selenium — e.g. the
+  // tye2ebrowser Docker container (d/selenium, or b/e2e6) listening on
+  // :4444 with Chrome inside — instead of letting a wdio service install
+  // and start a local one (which needs Java + a local browser). No-op
+  // unless the env var is set.
+  ...(process.env.TY_E2E_REMOTE_SELENIUM ? {
+    hostname: process.env.TY_E2E_SELENIUM_HOST || 'localhost',
+    port: parseInt(process.env.TY_E2E_SELENIUM_PORT || '4444'),
+    path: process.env.TY_E2E_SELENIUM_PATH || '/wd/hub',
+  } : {}),
+
   // This requires Java — will start Selenium, listens on port 4444.
   // (This binary: node_modules/selenium-standalone/.selenium/selenium-server/3.141.5-server.jar )
   // Does use a Docker container with Chrome — so, can be invisible.
   //
-  services: [
+  services: process.env.TY_E2E_REMOTE_SELENIUM ? [] : [
     settings.useChromedriver ? 'chromedriver' : (    // if script flag:  --cd
       settings.useDevtoolsProtocol ? 'devtools' : (  // if script flag:  --dt
         ['selenium-standalone', {                    // else the default
