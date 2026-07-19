@@ -11,18 +11,22 @@
 #
 # Source this file, then call ensure_dind "$repo"; use $TY_DIND_DOCKER_HOST.
 
-TY_DIND_NAME=ty-dind
-TY_DIND_NET=ty-build-net
-TY_DIND_VOL=ty-dind-cache
+# Overridable, so independent contexts (e.g. the CI runner clone vs an
+# interactive checkout — different repo paths!) get their OWN daemon, cache
+# volume and network. One dind can only mount one repo path.
+TY_DIND_NAME="${TY_DIND_NAME:-ty-dind}"
+TY_DIND_NET="${TY_DIND_NET:-ty-build-net}"
+TY_DIND_VOL="${TY_DIND_VOL:-ty-dind-cache}"
 
 # TY_DIND_OFFLINE=1: hermetic mode — the dind daemon goes on an *internal*
 # bridge (no NAT, no egress), but reuses the same image-cache volume a
 # previous online run populated. Any step that tries to fetch anything
 # fails fast, proving the vendored inputs are complete. Separate container
 # and network names, so online and offline daemons can't be confused.
+_ty_dind_base_name="$TY_DIND_NAME"
 if [ -n "${TY_DIND_OFFLINE:-}" ]; then
-  TY_DIND_NAME=ty-dind-offline
-  TY_DIND_NET=ty-build-net-offline
+  TY_DIND_NAME="${_ty_dind_base_name}-offline"
+  TY_DIND_NET="${TY_DIND_NET}-offline"
 fi
 # Digest-pinned (b/pin-digests); same engine major as typical hosts.
 TY_DIND_IMAGE=docker:29-dind@sha256:bfec1f5159c63a81ca6fdedbd81404d2c0e16378ed0feec3bb3fbf3998847659
@@ -37,8 +41,8 @@ ensure_dind() {
 
   # The cache volume can back only ONE running dockerd — stop the other-mode
   # daemon (online vs offline) before starting this one.
-  local other=ty-dind
-  [ -z "${TY_DIND_OFFLINE:-}" ] && other=ty-dind-offline
+  local other="$_ty_dind_base_name"
+  [ -z "${TY_DIND_OFFLINE:-}" ] && other="${_ty_dind_base_name}-offline"
   if docker ps -a --format '{{.Names}}' | grep -qx "$other"; then
     echo "dind: removing $other first (the cache volume can back only one daemon)" >&2
     docker rm -f "$other" >/dev/null
