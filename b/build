@@ -73,6 +73,7 @@ if [ -n "$isolated" ]; then
     --network "$TY_DIND_NET" \
     -e "DOCKER_HOST=$TY_DIND_DOCKER_HOST" \
     -e "HOST_UID=$(id -u)" \
+    -e "TY_NONINTERACTIVE=${TY_NONINTERACTIVE:-1}" \
     -e "HOST_GID=$(id -g)" \
     "${heap_env[@]}" \
     ty-builder "$@"
@@ -83,6 +84,7 @@ exec docker run --rm -i $tty_flag \
   -w "$repo" \
   -v "$sock":"$sock" \
   -e "HOST_UID=$(id -u)" \
+  -e "TY_NONINTERACTIVE=${TY_NONINTERACTIVE:-1}" \
   -e "HOST_GID=$(id -g)" \
   -e "DOCKER_GID=$(stat -c %g "$sock")" \
   "${heap_env[@]}" \
