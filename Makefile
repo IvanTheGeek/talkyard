@@ -576,10 +576,9 @@ to-talkyard: to-talkyard/dist/to-talkyard/src/to-talkyard.js
 
 to-talkyard/dist/to-talkyard/src/to-talkyard.js: $(shell find to-talkyard/src/)
 	@echo "Building To-Talkyard ..."
-	@cd to-talkyard ;\
-	set -x ;\
-	yarn ;\
-	yarn build
+	@# pnpm not yarn [build_needs_yarn], and in the nodejs container so the
+	@# host doesn't need Node — same pattern as s/yarn and the gulp targets.
+	$(d_c) run --rm nodejs sh -c 'cd to-talkyard && pnpm install --frozen-lockfile && pnpm run build'
 	@echo "... Done building To-Talkyard."
 
 
