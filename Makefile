@@ -578,7 +578,10 @@ to-talkyard/dist/to-talkyard/src/to-talkyard.js: $(shell find to-talkyard/src/)
 	@echo "Building To-Talkyard ..."
 	@# pnpm not yarn [build_needs_yarn], and in the nodejs container so the
 	@# host doesn't need Node — same pattern as s/yarn and the gulp targets.
-	$(d_c) run --rm nodejs sh -c 'cd to-talkyard && pnpm install --frozen-lockfile && pnpm run build'
+	@# A script path, NOT `sh -c '...'` or --workdir: the nodejs entrypoint
+	@# cd's to the repo root and re-joins args via `su -c "$$*"`, which
+	@# mangles quoted payloads and discards the workdir.
+	$(d_c) run --rm nodejs s/impl/build-to-talkyard.sh
 	@echo "... Done building To-Talkyard."
 
 
