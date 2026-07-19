@@ -46,8 +46,13 @@ if [ "$(id -u)" -eq 0 ]; then
   exit 1
 fi
 
-echo "b/build: building ty-builder image ..." >&2
-docker build -t ty-builder "$repo/images/builder" >&2
+# TY_BUILDER_IMG: use a prebuilt builder image (e.g. pulled via
+# b/pull-build-images) instead of building locally.
+builder_img="${TY_BUILDER_IMG:-ty-builder}"
+if [ -z "${TY_BUILDER_IMG:-}" ]; then
+  echo "b/build: building ty-builder image ..." >&2
+  docker build -t ty-builder "$repo/images/builder" >&2
+fi
 
 tty_flag=""
 if [ -t 0 ] && [ -t 1 ]; then tty_flag="-t"; fi
@@ -81,4 +86,4 @@ exec docker run --rm -i $tty_flag \
   -e "HOST_GID=$(id -g)" \
   -e "DOCKER_GID=$(stat -c %g "$sock")" \
   "${heap_env[@]}" \
-  ty-builder "$@"
+  "$builder_img" "$@"
