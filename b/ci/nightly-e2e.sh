@@ -33,6 +33,12 @@ b/build --isolated bash -c 'sudo docker compose build nodejs app rendr cache rdb
 TY_BUILD_HEAP_MB=6144 b/build --isolated bash -c 's/d-cli compile < /dev/null' \
   > "$logs/compile.log" 2>&1 || { echo "compile FAILED:"; tail -20 "$logs/compile.log"; exit 1; }
 
+echo "=== debug asset bundles (gulp in container — /-/are-scripts-ready checks
+# for these; a fresh clone has none, so the ready-wait can never succeed
+# without this step, and the browsers need the bundles anyway) ==="
+b/build --isolated bash -c 'make debug_asset_bundles' \
+  > "$logs/bundles.log" 2>&1 || { echo "bundles FAILED:"; tail -20 "$logs/bundles.log"; exit 1; }
+
 echo "=== stack up (isolated dind) ==="
 b/build --isolated bash -c 'sudo docker compose up -d' \
   >> "$logs/stack-up.log" 2>&1
