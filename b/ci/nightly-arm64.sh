@@ -84,7 +84,15 @@ if [ "$arch" != "aarch64" ]; then
   echo "app container arch is '$arch', expected aarch64 — not an arm64 image?"
   exit 1
 fi
-echo "smoke OK: app healthy and running aarch64"
+# The healthcheck endpoint answers even with no DB (found live: a boot-time
+# DNS hiccup left the app healthy-but-stateless) — assert migrations ran.
+if ! docker exec "$TY_DIND_NAME" docker logs tya-smoke-app-1 2>&1 \
+     | grep -q 'Done migrating database'; then
+  echo "app is healthy but the DB migration never succeeded; log tail:"
+  docker exec "$TY_DIND_NAME" docker logs --tail 30 tya-smoke-app-1 2>&1 | tail -30
+  exit 1
+fi
+echo "smoke OK: app healthy, aarch64, DB migrated"
 
 if [ -n "${TY_PUBLISH_ARM64:-}" ]; then
   version_tag="$(cat version.txt)-$(git rev-parse --short HEAD)"
