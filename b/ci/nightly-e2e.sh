@@ -29,12 +29,13 @@ echo "=== stack up (isolated dind) ==="
 b/build --isolated bash -c 'sudo docker compose build nodejs app rendr cache rdb search egressp && sudo docker compose up -d' \
   > "$logs/stack-up.log" 2>&1
 
-echo "=== waiting for server ==="
+echo "=== waiting for server (cold CI clone = full dev-mode compile, can take 30+ min) ==="
 ready=""
-for i in $(seq 1 90); do
+for i in $(seq 1 480); do
   if docker exec "$TY_DIND_NAME" wget -q -O /dev/null http://localhost/-/are-scripts-ready 2>/dev/null; then
     ready=1; echo "server ready (~$(( i * 5 ))s)"; break
   fi
+  [ $(( i % 24 )) -eq 0 ] && echo "  still compiling/starting (~$(( i * 5 / 60 )) min)"
   sleep 5
 done
 [ -z "$ready" ] && { echo "server never became ready"; tail -50 "$logs/stack-up.log"; exit 1; }
