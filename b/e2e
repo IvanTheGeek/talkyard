@@ -1,0 +1,35 @@
+#!/bin/bash
+# Run wdio7 e2e tests in the ty-e2e-runner container — host needs only Docker.
+# The Talkyard stack itself must already be up (dev stack: `b/build make up`;
+# or the prod-test stack for release testing) with ports 80/443 free for it.
+#
+#   b/e2e --spec api-search-full-text.1br.f      # smoke: just these specs
+#   b/e2e --shard 2/4                            # this shard of the suite
+#   b/e2e --dry-run --shard 2/4                  # show what the shard runs
+#   b/e2e                                        # the whole suite, grouped
+#
+# CI sharding: run M matrix jobs, each with its own Talkyard stack, passing
+# --shard N/M. Specs are bucketed by browser count (1br/2br/3br/4br) and
+# round-robined within each bucket, so shards stay balanced and each group
+# still runs with the right --Nbr flag.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+repo="$(pwd)"
+
+echo "b/e2e: building ty-e2e-runner image ..." >&2
+docker build -t ty-e2e-runner "$repo/images/e2e-runner" >&2
+
+tty_flag=""
+if [ -t 0 ] && [ -t 1 ]; then tty_flag="-t"; fi
+
+exec docker run --rm -i $tty_flag \
+  --network=host \
+  -v "$repo":"$repo" \
+  -w "$repo" \
+  -e "HOST_UID=$(id -u)" \
+  -e "HOST_GID=$(id -g)" \
+  -e TY_E2E_CHROME_BIN=/usr/bin/chromium \
+  -e TY_E2E_CHROMEDRIVER_PATH=/usr/bin/chromedriver \
+  -e TY_E2E_CHROME_NO_SANDBOX=1 \
+  ty-e2e-runner b/impl/e2e-wdio7.sh "$@"
