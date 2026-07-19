@@ -1,0 +1,16 @@
+# Monthly, regardless of code changes: are all pinned external inputs still
+# fetchable? (Registries move even when the repo doesn't.)
+name: monthly-probe
+on:
+  schedule:
+    - cron: '0 6 1 * *'
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: tybuild
+    timeout-minutes: 30
+    steps:
+      - name: Sync CI clone
+        run: $HOME/forgejo-runner/talkyard/b/ci/sync-clone.sh
+      - name: Availability probe
+        run: $HOME/forgejo-runner/talkyard/b/ci/monthly-probe.sh

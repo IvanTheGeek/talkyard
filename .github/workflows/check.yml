@@ -1,0 +1,44 @@
+# Light PR/push gate on GitHub-hosted runners: pin guard + full b/check
+# (client TS bundles + sbt compile + unit/app test suite, everything in
+# containers). Heavy jobs (e2e, hermetic, publish) run on the self-hosted
+# Forgejo runner instead — see .forgejo/workflows/.
+#
+# Supply-chain posture: third-party actions pinned by commit SHA, base
+# images digest-pinned (enforced by b/pin-digests --check), no secrets used.
+name: check
+
+on:
+  push:
+    branches: [docker-only-build]
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      # actions/checkout v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          submodules: recursive
+
+      - name: Free disk space (GH runners have ~14 GB free)
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+                      /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h / | tail -1
+
+      - name: Kernel settings for Elasticsearch
+        run: sudo sysctl -w vm.max_map_count=262144
+
+      - name: Digest-pin guard
+        run: ./b/pin-digests --check
+
+      - name: b/check (bundles + sbt test, all in containers)
+        env:
+          TY_BUILD_HEAP_MB: "6144"
+        run: ./b/build b/check
+
+      - name: Stage summary
+        if: always()
+        run: cat target/ty-build-summary.txt || true

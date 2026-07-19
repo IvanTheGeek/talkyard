@@ -1,0 +1,19 @@
+# Both e2e suites nightly, entirely inside the CI dind daemon (host ports
+# untouched). Change-guarded; TY_BASELINE=1 during the baseline period runs
+# the FULL suites every night to (re)derive the green lists.
+name: nightly-e2e
+on:
+  schedule:
+    - cron: '30 3 * * *'
+  workflow_dispatch:
+jobs:
+  e2e:
+    runs-on: tybuild
+    timeout-minutes: 480
+    steps:
+      - name: Sync CI clone
+        run: $HOME/forgejo-runner/talkyard/b/ci/sync-clone.sh
+      - name: Nightly e2e
+        env:
+          TY_BASELINE: '1'
+        run: $HOME/forgejo-runner/talkyard/b/ci/nightly-e2e.sh

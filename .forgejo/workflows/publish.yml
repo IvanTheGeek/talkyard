@@ -1,0 +1,14 @@
+# Manual: push the warm build/runner images to the self-hosted registry
+# (TY_PUBLISH_GHCR_MIRROR=1 in the env below to also mirror to ghcr).
+name: publish
+on:
+  workflow_dispatch:
+jobs:
+  publish:
+    runs-on: tybuild
+    timeout-minutes: 60
+    steps:
+      - name: Sync CI clone
+        run: $HOME/forgejo-runner/talkyard/b/ci/sync-clone.sh
+      - name: Push images
+        run: $HOME/forgejo-runner/talkyard/b/ci/publish.sh

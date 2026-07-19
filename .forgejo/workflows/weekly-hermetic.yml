@@ -1,0 +1,16 @@
+# Weekly: warm the CI dind cache online, then a full-clean build + test with
+# ZERO network (offline dind). Proves the vendored inputs stay complete.
+name: weekly-hermetic
+on:
+  schedule:
+    - cron: '0 5 * * 0'
+  workflow_dispatch:
+jobs:
+  hermetic:
+    runs-on: tybuild
+    timeout-minutes: 240
+    steps:
+      - name: Sync CI clone
+        run: $HOME/forgejo-runner/talkyard/b/ci/sync-clone.sh
+      - name: Hermetic offline build + test
+        run: $HOME/forgejo-runner/talkyard/b/ci/weekly-hermetic.sh
