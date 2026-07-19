@@ -50,8 +50,14 @@ RUN \
 # Maybe delete node_modules, and docker/gulp-home
 # More here: https://github.com/gulpjs/gulp/issues/2162  (happened for me with Ubuntu Linux)
 
-RUN cd /usr/local/bin/ && \
-    ln -s /opt/talkyard/server/node_modules/.bin/gulp ./
+# Not a symlink: pnpm writes node_modules/.bin entries as sh shims that
+# locate gulp.js relative to $0 — invoked via a symlink from here, $0 would
+# be /usr/local/bin/gulp and the shim would look for the nonexistent
+# /usr/local/gulp/bin/gulp.js. A wrapper that execs the shim by its real
+# path keeps $0 right, and works with yarn-era symlink stubs too.
+RUN printf '#!/bin/sh\nexec /opt/talkyard/server/node_modules/.bin/gulp "$@"\n' \
+        > /usr/local/bin/gulp && \
+    chmod +x /usr/local/bin/gulp
 
 # pnpm, so `docker compose run --rm nodejs pnpm ...` works (s/yarn, and the
 # to-talkyard Makefile target). The base image has no pnpm and Node is
