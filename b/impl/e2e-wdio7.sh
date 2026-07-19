@@ -6,20 +6,24 @@
 # --4br; untagged = 1 browser), so specs MUST run grouped by that tag.
 #
 # Options:
-#   --shard N/M     run the Nth of M balanced shards (default 1/1 = all)
-#   --retries K     wdio --specFileRetries (default 2)
-#   --spec NAME     run only this spec (repeatable; overrides sharding)
-#   --dry-run       print the spec assignment and exit
+#   --shard N/M            run the Nth of M balanced shards (default 1/1 = all)
+#   --retries K            wdio --specFileRetries (default 2)
+#   --spec NAME            run only this spec (repeatable; overrides sharding)
+#   --skip-expected-fails  drop specs matching b/impl/e2e-expected-env-fails.txt
+#                          (environmental failures: IdP secrets, static-site
+#                          servers, real egress — the curated CI green gate)
+#   --dry-run              print the spec assignment and exit
 set -uo pipefail
 
 cd "$(dirname "$0")/../.."
 
-shard="1/1"; retries=2; dry_run=""; only_specs=()
+shard="1/1"; retries=2; dry_run=""; skip_expected=""; only_specs=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --shard)   shard="$2"; shift 2 ;;
     --retries) retries="$2"; shift 2 ;;
     --spec)    only_specs+=("$2"); shift 2 ;;
+    --skip-expected-fails) skip_expected=1; shift ;;
     --dry-run) dry_run=1; shift ;;
     *) echo "e2e-wdio7.sh: unknown option: $1" >&2; exit 2 ;;
   esac
@@ -37,6 +41,24 @@ fi
 
 # Enumerate + bucket. Sorted => deterministic shard assignment.
 mapfile -t all < <(cd tests/e2e-wdio7 && ls specs/*.e2e.ts | sort)
+
+# Expected-env-fail filtering happens BEFORE sharding, so shard sizes stay
+# balanced over the specs that actually run.
+if [ -n "$skip_expected" ]; then
+  mapfile -t patterns < <(grep -v '^\s*#' b/impl/e2e-expected-env-fails.txt | grep -v '^\s*$')
+  kept=(); skipped=0
+  for s in "${all[@]}"; do
+    base="${s#specs/}"
+    hit=""
+    for p in "${patterns[@]}"; do
+      # shellcheck disable=SC2254
+      case "$base" in $p) hit=1; break ;; esac
+    done
+    if [ -n "$hit" ]; then skipped=$(( skipped + 1 )); else kept+=("$s"); fi
+  done
+  echo "=== e2e: skipping $skipped expected-env-fail specs (b/impl/e2e-expected-env-fails.txt)"
+  all=("${kept[@]}")
+fi
 g1=(); g2=(); g3=(); g4=()
 for s in "${all[@]}"; do
   case "$s" in
