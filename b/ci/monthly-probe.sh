@@ -28,7 +28,7 @@ curl -fsS -o /dev/null https://registry.npmjs.org/fibers && echo "ok    registry
 curl -fsSI -o /dev/null https://github.com/laverdet/node-fibers/releases && echo "ok    fibers releases" || { echo "FAIL  fibers releases"; fail=1; }
 
 echo "=== crates.io (sqlx-cli 0.8.6) reachable ==="
-curl -fsS -o /dev/null https://crates.io/api/v1/crates/sqlx-cli/0.8.6 && echo "ok    crates.io sqlx-cli 0.8.6" || { echo "FAIL  crates.io"; fail=1; }
+curl -fsS -A 'ty-build-monthly-probe (forgejo.ivanthegeek.com)' -o /dev/null https://crates.io/api/v1/crates/sqlx-cli/0.8.6 && echo "ok    crates.io sqlx-cli 0.8.6" || { echo "FAIL  crates.io"; fail=1; }
 
 if [ $fail -eq 0 ]; then echo "monthly-probe: all pinned inputs available."; else echo "monthly-probe: SOME INPUTS UNAVAILABLE — vendor or re-pin before they rot further."; fi
 exit $fail
