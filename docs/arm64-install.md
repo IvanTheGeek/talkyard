@@ -1,11 +1,15 @@
 # Installing Talkyard on ARM64 (Raspberry Pi, Apple Silicon, ARM cloud)
 
-**Status: experimental.** These are community-built ARM64 images of Talkyard
-v1, produced by this fork's dual-arch build pipeline (see
-[`b/README.md`](../b/README.md), section "Dual-arch") — not official upstream
-images. The full stack has been verified end-to-end under qemu emulation
-(boots, migrates, serves HTTPS); validation on real ARM hardware is in
-progress. Use for experiments and non-critical forums; keep backups.
+**Status: experimental — and unofficial.** These are community-built ARM64
+images of Talkyard v1, produced by the `b/` Docker-only build pipeline in
+this fork (see [`b/README.md`](../b/README.md), section "Dual-arch"). That
+pipeline is the fork maintainer's own tooling — **not sanctioned by, or
+affiliated with, the upstream Talkyard project**. The Talkyard application
+code itself is **unchanged upstream source** (v1.2026.004); this fork adds
+only build/packaging tooling around it. The full stack has been verified
+end-to-end under qemu emulation (boots, migrates, serves HTTPS); validation
+on real ARM hardware is in progress. Use for experiments and non-critical
+forums; keep backups.
 
 Background: the port turned out to be packaging, not code — an audit and the
 change history are written up here:
@@ -116,6 +120,7 @@ mail server config, etc.) follow upstream's README alongside.
 - Tags are single-arch with a `-arm64` suffix; multi-arch tags (same tag on
   every CPU) are planned via manifest stitching.
 - No automatic upgrade channel — watch the packages page and re-pin.
-- Images track this fork's `docker-only-build` branch (currently Talkyard
-  v1.2026.004). The intent is to upstream the (small) changes so official
-  multi-arch images can exist — see the write-up linked at the top.
+- Images track this fork's `docker-only-build` branch (currently unmodified
+  Talkyard v1.2026.004 application code + this fork's build tooling).
+  Whether official upstream arm64 images ever happen is entirely upstream's
+  call — nothing here is endorsed by the Talkyard project.
