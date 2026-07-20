@@ -43,6 +43,12 @@ while :; do
     --isolated)
       isolated=1; shift ;;
     --clean-isolated)
+      # Honor a preceding --arch: clean that arch's dind, not the default one.
+      if [ -n "$target_arch" ] && [ -z "${TY_DIND_NAME:-}" ]; then
+        export TY_DIND_NAME="ty-dind-$target_arch"
+        export TY_DIND_NET="ty-build-net-$target_arch"
+        export TY_DIND_VOL="ty-dind-$target_arch-cache"
+      fi
       . b/impl/dind-lib.sh
       clean_dind
       exit 0 ;;
