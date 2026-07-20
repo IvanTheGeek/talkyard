@@ -19,6 +19,18 @@ cd "$(dirname "$0")/.."
 . b/impl/stages-lib.sh
 ty_stages_init
 
+ty_stage "no pull_request-triggered Forgejo workflows"
+# SECURITY INVARIANT: the Forgejo repo is PUBLIC and its runner is host-mode
+# (jobs run directly on the box, full docker access). A pull_request trigger
+# would let a stranger's fork PR execute code there. Keep triggers to
+# cron/dispatch/push (writer-only) — fail loudly if anyone adds one.
+if grep -lE '^[[:space:]]*(pull_request|pull_request_target)[[:space:]]*:' \
+     .forgejo/workflows/*.yml 2>/dev/null; then
+  echo "b/check: pull_request trigger found in .forgejo/workflows/ (files above)."
+  echo "That would run stranger-controlled code on the host-mode runner. Refusing."
+  exit 1
+fi
+
 ty_stage "git submodules"
 make git-subm-init-upd || exit $?
 
