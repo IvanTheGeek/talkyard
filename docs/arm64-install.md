@@ -1,4 +1,8 @@
-# Installing Talkyard on ARM64 (Raspberry Pi, Apple Silicon, ARM cloud)
+# Installing Talkyard on ARM64/AArch64 (Raspberry Pi, Apple Silicon, ARM cloud)
+
+*(ARM64 and AArch64 are two names for the same 64-bit ARM architecture —
+this page uses both so either search term finds it. Docker calls the
+platform `arm64`; `uname -m` prints `aarch64`.)*
 
 **Status: experimental — and unofficial.** These are community-built ARM64
 images of Talkyard v1, produced by the `b/` Docker-only build pipeline in
@@ -28,7 +32,7 @@ change history are written up here:
 
 ## The images
 
-Eight runtime images per release, published to a Forgejo container registry
+Eight ARM64/AArch64 runtime images per release, published to a Forgejo container registry
 that allows **anonymous pulls** (docker negotiates the token flow
 automatically — no account needed):
 

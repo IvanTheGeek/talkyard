@@ -67,7 +67,7 @@ are recoverable later: webhooks (start `fakeweb` via
 `docker compose --profile e2etests up -d fakeweb`) and non-Gatsby embcom
 (add an http-server sidecar to the runner image).
 
-## Dual-arch (amd64 + arm64)
+## Dual-arch (amd64 + arm64/aarch64)
 
 The chain can produce the runtime images for linux/arm64 (Raspberry Pi,
 Apple Silicon, arm64 cloud) as well as native amd64:
